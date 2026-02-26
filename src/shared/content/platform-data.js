@@ -1,3 +1,6 @@
+const ASSET_BASE = (import.meta.env.BASE_URL || "/").replace(/\/?$/, "/");
+const logo = (name) => `${ASSET_BASE}images/${name}`;
+
 export const CROP_STATS = [
   { id: "1", species: "Triticum aestivum", name: "Wheat", proteins: "104,701", go: "4,895", kegg: "139", tf: "5,833" },
   { id: "2", species: "Zea mays", name: "Maize", proteins: "57,865", go: "5,983", kegg: "139", tf: "3,425" },
@@ -12,15 +15,14 @@ export const CROP_STATS = [
 ];
 
 export const EXTERNAL_DATA_SOURCES = [
-  { name: "HPIDB", link: "https://hpidb.igbb.msstate.edu/", logo: "/images/hpidb.png" },
-  { name: "IntAct", link: "http://www.ebi.ac.uk/intact/", logo: "/images/intact.png" },
-  { name: "MINT", link: "http://mint.bio.uniroma2.it", logo: "/images/mint.png" },
-  { name: "BioGRID", link: "https://thebiogrid.org/", logo: "/images/biogrid.png" },
-  { name: "STRING", link: "https://string-db.org/", logo: "/images/string.png" },
-  { name: "DIP", link: "http://dip.doe-mbi.ucla.edu/", logo: "/images/dip.png" },
-  { name: "DOMINE", link: "https://manticore.niehs.nih.gov/cgi-bin/Domine", logo: "/images/domine.png" },
-  { name: "3did", link: "https://3did.irbbarcelona.org/", logo: "/images/3did.png" },
-  { name: "UniProt", link: "http://www.uniprot.org/", logo: "/images/uniprot.png" },
-  { name: "ENSEMBL", link: "https://ensembl.org", logo: "/images/ensembl.png" }
+  { name: "HPIDB", link: "https://hpidb.igbb.msstate.edu/", logo: logo("hpidb.png") },
+  { name: "IntAct", link: "http://www.ebi.ac.uk/intact/", logo: logo("intact.png") },
+  { name: "MINT", link: "http://mint.bio.uniroma2.it", logo: logo("mint.png") },
+  { name: "BioGRID", link: "https://thebiogrid.org/", logo: logo("biogrid.png") },
+  { name: "STRING", link: "https://string-db.org/", logo: logo("string.png") },
+  { name: "DIP", link: "http://dip.doe-mbi.ucla.edu/", logo: logo("dip.png") },
+  { name: "DOMINE", link: "https://manticore.niehs.nih.gov/cgi-bin/Domine", logo: logo("domine.png") },
+  { name: "3did", link: "https://3did.irbbarcelona.org/", logo: logo("3did.png") },
+  { name: "UniProt", link: "http://www.uniprot.org/", logo: logo("uniprot.png") },
+  { name: "ENSEMBL", link: "https://ensembl.org", logo: logo("ensembl.png") }
 ];
-
