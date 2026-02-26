@@ -187,7 +187,7 @@ export default function NetworkPage() {
   const sourceTotal = Number.isFinite(sourceTotalParam) ? sourceTotalParam : null;
 
   const [search, setSearch] = useState("");
-  const [loadMode, setLoadMode] = useState("append");
+  const [loadMode, setLoadMode] = useState("replace");
   const [chunkOffset, setChunkOffset] = useState(0);
   const [accumulatedRows, setAccumulatedRows] = useState([]);
   const [networkTotal, setNetworkTotal] = useState(0);
@@ -551,6 +551,32 @@ export default function NetworkPage() {
     downloadText(JSON.stringify(payload, null, 2), `hpinet-network-meta-${rtype}-${Date.now()}.json`);
   }
 
+  async function exportCytoscapeTsv() {
+    if (!resultId) return;
+    try {
+      const response = await hpinetApi.downloadResults({ resultId, category: rtype });
+      const rowsAll = Array.isArray(response?.results) ? response.results : [];
+      if (rowsAll.length === 0) {
+        return;
+      }
+      const header = ["source", "target", "confidence", "source_db", "method", "type"];
+      const lines = [header.join("\t")];
+      for (const row of rowsAll) {
+        const source = row.Host_Protein || row.ProteinA || "";
+        const target = row.Pathogen_Protein || row.ProteinB || "";
+        if (!source || !target) continue;
+        const confidence = row.Confidence ?? row.Score ?? row.score ?? "";
+        const sourceDb = row.intdb_x || row.intdb || "";
+        const method = row.Method || rtype || "";
+        const type = row.Type || "";
+        lines.push([source, target, confidence, sourceDb, method, type].map((v) => String(v).replace(/\t/g, " ")).join("\t"));
+      }
+      downloadText(lines.join("\n"), `hpinet-network-${rtype}-${resultId}.tsv`, "text/tab-separated-values;charset=utf-8");
+    } catch (error) {
+      alert(error?.message || "Failed to export full network TSV");
+    }
+  }
+
   return (
     <section className="hp-fade-up">
       <PageHeader
@@ -611,8 +637,8 @@ export default function NetworkPage() {
                     value={loadMode}
                     onChange={(e) => setLoadMode(e.target.value)}
                   >
-                    <option value="append">Append mode</option>
                     <option value="replace">Replace mode</option>
+                    <option value="append">Append mode</option>
                   </Form.Select>
                 </div>
                 {loadMode === "append" ? (
@@ -765,6 +791,9 @@ export default function NetworkPage() {
                   <Button size="sm" variant="outline-secondary" onClick={exportSvg}>SVG</Button>
                   <Button size="sm" variant="outline-secondary" onClick={exportPdf}>PDF</Button>
                   <Button size="sm" variant="outline-secondary" onClick={exportNetworkMetadata}>Meta JSON</Button>
+                  <Button size="sm" variant="outline-secondary" onClick={exportCytoscapeTsv}>
+                    Full TSV
+                  </Button>
                 </div>
               </div>
 

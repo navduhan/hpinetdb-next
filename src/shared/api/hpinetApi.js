@@ -14,6 +14,17 @@ export const hpinetApi = {
     return normalizePagedResponse(data);
   },
 
+  downloadResults: async ({ resultId, category, signal }) => {
+    const data = await request("/api/download/", {
+      query: { results: resultId, category },
+      timeoutMs: 600_000,
+      signal
+    });
+    return {
+      results: data?.results || []
+    };
+  },
+
   getNetwork: async ({ resultId, category, limit, offset, sort, signal }) => {
     const data = await request("/api/network/", {
       query: { results: resultId, category, limit, offset, sort },
