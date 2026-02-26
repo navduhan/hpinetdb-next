@@ -3,7 +3,7 @@
     {
       "name": "hpinetdb-next",
       "script": "npm",
-      "args": "run preview -- --host 0.0.0.0 --port 3814",
+      "args": "run preview -- --host 0.0.0.0 --port 3810",
       "exec_mode": "fork",
       "instances": 1,
       "autorestart": true,
