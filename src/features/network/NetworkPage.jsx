@@ -39,6 +39,7 @@ const LAYOUT_OPTIONS = [
 ];
 const NETWORK_CHUNK_SIZE = 5000;
 const NETWORK_MAX_RENDER_EDGES = 20000;
+const LARGE_LAYOUT_THRESHOLD = 2000;
 
 function getLayoutConfig(name) {
   if (name === "cose") {
@@ -206,6 +207,7 @@ export default function NetworkPage() {
   const [layoutName, setLayoutName] = useState("fcose");
   const cyRef = useRef(null);
   const nodeScoresRef = useRef({});
+  const activeLayoutRef = useRef(null);
 
   const query = useQueryResource({
     key: ["network", resultId, rtype, chunkOffset],
@@ -329,6 +331,9 @@ export default function NetworkPage() {
   const overRenderCap = visibleRows.length > NETWORK_MAX_RENDER_EDGES;
   const renderRows = overRenderCap ? visibleRows.slice(0, NETWORK_MAX_RENDER_EDGES) : visibleRows;
   const effectiveFastMode = fastMode || renderRows.length > 5000;
+  const appliedLayoutName = layoutName === "fcose" && renderRows.length > LARGE_LAYOUT_THRESHOLD
+    ? "cose"
+    : layoutName;
 
   useEffect(() => {
     if (!expandedNodeId) return;
@@ -369,16 +374,30 @@ export default function NetworkPage() {
 
   useEffect(() => {
     const cy = cyRef.current;
-    if (!cy || cy.destroyed()) return;
-    // Avoid re-layout on every chunk append; it can race Cytoscape internals for large graphs.
-    try {
-      if (elements.length > 0) {
-        cy.fit(undefined, 20);
+    if (!cy || cy.destroyed() || elements.length === 0) return undefined;
+
+    const rafId = window.requestAnimationFrame(() => {
+      if (!cy || cy.destroyed()) return;
+      try {
+        if (activeLayoutRef.current && typeof activeLayoutRef.current.stop === "function") {
+          activeLayoutRef.current.stop();
+        }
+      } catch {
+        // ignore
       }
-    } catch {
-      // ignore transient fit errors during mount/update churn
-    }
-  }, [elements]);
+      try {
+        const layout = cy.layout(getLayoutConfig(appliedLayoutName));
+        activeLayoutRef.current = layout;
+        layout.run();
+      } catch {
+        // ignore transient layout errors
+      }
+    });
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+    };
+  }, [elements, appliedLayoutName]);
 
   useEffect(() => {
     const cy = cyRef.current;
@@ -800,10 +819,15 @@ export default function NetworkPage() {
                 </div>
               </div>
 
-              <small className="hp-muted d-block mb-2">Mouse: wheel to zoom, drag to pan.</small>
-              <div className="mb-2">
-                <Form.Check
-                  type="switch"
+                <small className="hp-muted d-block mb-2">Mouse: wheel to zoom, drag to pan.</small>
+                {layoutName === "fcose" && appliedLayoutName !== "fcose" ? (
+                  <small className="hp-muted d-block mb-2">
+                    Large graph detected: using CoSE automatically for stable initial layout.
+                  </small>
+                ) : null}
+                <div className="mb-2">
+                  <Form.Check
+                    type="switch"
                   id="network-fast-mode"
                   label="Fast render mode (recommended for large networks)"
                   checked={fastMode}
@@ -823,6 +847,7 @@ export default function NetworkPage() {
                       height: 10,
                       "font-size": 5,
                       label: effectiveFastMode ? "" : "data(label)",
+                      "text-opacity": effectiveFastMode ? 0 : 1,
                       color: "#233",
                       "text-wrap": "none"
                     }
