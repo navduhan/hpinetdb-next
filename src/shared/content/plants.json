@@ -1,0 +1,71 @@
+[
+{
+    "id": "1",
+    "name": "Wheat",
+    "sname": "Triticum aestivum",
+    "pathogen": ["tindica", "psyringaewheat", "pgramini", "pstriiformis","ptriticina","bgraminiswheat","fgramineadrum","tcaries","tlaevis","utritici", "wymv", "wsmv" ]
+},
+{
+    "id": "2",
+    "name": "Maize",
+    "sname": "Zea Mays",
+    "pathogen": ["bmaydis", "czeaemydis", "psorghi", "umaydis", "xvasicola","cgraminicola","eturcica", "psyringaewheat", "mdmv", "mcmv", "smv"]
+},
+{
+    "id": "3",
+    "name": "Barley",
+    "sname": "Hordeum vulgare",
+    "pathogen": ["bgraminisbarley", "fgramineadrum",  "psyringaeatrofaciens", "pgramini", "pteres", "bsmv"]
+  
+},
+{
+    "id": "4",
+    "name": "Rice",
+    "sname": "Oryza sativa",
+    "pathogen": ["boryzae","bglumae","moryzae","rsolani","xoryzae", "rymv", "rtsv", "rtbv", "rdv"]
+  
+},
+{
+    "id": "5",
+    "name": "Rye",
+    "sname": "Secale_cereale",
+    "pathogen": ["bgraminisef2","cgraminicola", "pteres","utritici", "cpurpurea"]
+   
+},
+{
+    "id": "6",
+    "name": "Sorghum",
+    "sname": "Sorghum bicolor",
+    "pathogen": ["cgraminicola","mphaseolina", "psyringae", "eturcica","psorghi", "mdmv"]
+   
+},
+{
+    "id": "7",
+    "name": "Oat",
+    "sname": "Avena sativa",
+    "pathogen": ["bgraminisef2","cgraminicola","fpoae","pcoronafaciens","pcoronta"]
+    
+},
+{
+    "id": "8",
+    "name": "Foxtail",
+    "sname": "Setaria_italica",
+    "pathogen": ["aavenae"]
+
+},
+{
+    "id": "9",
+    "name": "Quinoa",
+    "sname": "Chenopodium quinoa",
+    "pathogen": ["pgriesea", "meleuinis"]
+    
+},
+{
+    "id": "10",
+    "name": "Ragi",
+    "sname": "Eleusine coracana",
+    "pathogen": ["pfarinosa","pgriesea"]
+}
+
+
+]

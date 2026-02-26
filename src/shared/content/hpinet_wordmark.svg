@@ -1,0 +1,20 @@
+<svg width="520" height="110" viewBox="0 0 520 110" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">HPInet Wordmark</title>
+  <desc id="desc">HPInet logo with stylized leaf icon and wordmark.</desc>
+  <defs>
+    <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0e6a62"/>
+      <stop offset="100%" stop-color="#2f6f75"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="520" height="110" fill="none"/>
+  <g transform="translate(12,10)">
+    <path d="M38 84C17 63 13 36 24 14C45 16 62 26 72 44C63 66 54 78 38 84Z" fill="url(#g1)"/>
+    <path d="M30 74C44 57 54 41 64 22" stroke="#ffffff" stroke-width="4" stroke-linecap="round" fill="none"/>
+    <circle cx="75" cy="29" r="7" fill="#bda361"/>
+  </g>
+  <g transform="translate(104,24)">
+    <text x="0" y="44" fill="#094f49" font-size="48" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-weight="700" letter-spacing="1">HPInet</text>
+    <text x="2" y="72" fill="#5a6e6d" font-size="16" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" letter-spacing="0.6">Host-Pathogen Interaction Network</text>
+  </g>
+</svg>
