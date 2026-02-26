@@ -357,11 +357,16 @@ export default function NetworkPage() {
 
   useEffect(() => {
     const cy = cyRef.current;
-    if (!cy) return;
-    // Keep visualization synced when filters are relaxed/changed.
-    cy.layout(getLayoutConfig(layoutName)).run();
-    cy.fit(undefined, 20);
-  }, [elements, layoutName]);
+    if (!cy || cy.destroyed()) return;
+    // Avoid re-layout on every chunk append; it can race Cytoscape internals for large graphs.
+    try {
+      if (elements.length > 0) {
+        cy.fit(undefined, 20);
+      }
+    } catch {
+      // ignore transient fit errors during mount/update churn
+    }
+  }, [elements]);
 
   useEffect(() => {
     const cy = cyRef.current;
@@ -403,22 +408,32 @@ export default function NetworkPage() {
 
   function withExportLabels(exporter) {
     const cy = cyRef.current;
-    if (!cy) return;
+    if (!cy || cy.destroyed()) return;
     const restoreLabel = effectiveFastMode ? "" : "data(label)";
 
-    cy.startBatch();
-    cy.nodes().style("label", "data(label)");
-    cy.nodes().style("font-size", 8);
-    cy.endBatch();
-    cy.fit(undefined, 20);
+    try {
+      cy.startBatch();
+      cy.nodes().style("label", "data(label)");
+      cy.nodes().style("font-size", 8);
+      cy.endBatch();
+      cy.fit(undefined, 20);
+    } catch {
+      return;
+    }
 
     try {
       exporter(cy);
     } finally {
-      cy.startBatch();
-      cy.nodes().style("label", restoreLabel);
-      cy.nodes().style("font-size", 5);
-      cy.endBatch();
+      if (!cy.destroyed()) {
+        try {
+          cy.startBatch();
+          cy.nodes().style("label", restoreLabel);
+          cy.nodes().style("font-size", 5);
+          cy.endBatch();
+        } catch {
+          // ignore cleanup errors on unmounted/destroyed instance
+        }
+      }
     }
   }
 
