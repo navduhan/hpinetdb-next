@@ -5,8 +5,12 @@ import path from "node:path";
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const proxyTarget = (env.VITE_DEV_PROXY_TARGET || "https://kaabil.net").trim();
+  const baseUrl = mode === "development"
+    ? "/"
+    : ((env.VITE_BASE_URL || "/hpinet").trim().replace(/\/$/, "") + "/");
 
   return {
+    base: baseUrl,
     plugins: [react()],
     resolve: {
       alias: {
