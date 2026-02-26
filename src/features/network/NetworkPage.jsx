@@ -187,6 +187,7 @@ export default function NetworkPage() {
   const sourceTotal = Number.isFinite(sourceTotalParam) ? sourceTotalParam : null;
 
   const [search, setSearch] = useState("");
+  const [loadMode, setLoadMode] = useState("append");
   const [chunkOffset, setChunkOffset] = useState(0);
   const [accumulatedRows, setAccumulatedRows] = useState([]);
   const [networkTotal, setNetworkTotal] = useState(0);
@@ -229,11 +230,19 @@ export default function NetworkPage() {
   }, [resultId, rtype]);
 
   useEffect(() => {
+    setChunkOffset(0);
+    setAccumulatedRows([]);
+  }, [loadMode]);
+
+  useEffect(() => {
     if (!query.data) return;
     const incoming = Array.isArray(query.data.results) ? query.data.results : [];
     setNetworkTotal(Number(query.data.total || 0));
     setHasMoreRows(Boolean(query.data.hasMore));
     setAccumulatedRows((prev) => {
+      if (loadMode !== "append") {
+        return incoming;
+      }
       if (chunkOffset === 0) {
         return incoming;
       }
@@ -248,9 +257,12 @@ export default function NetworkPage() {
       }
       return merged;
     });
-  }, [query.data, chunkOffset, rtype]);
+  }, [query.data, chunkOffset, rtype, loadMode]);
 
-  const rows = accumulatedRows;
+  const rows = useMemo(
+    () => (loadMode === "append" ? accumulatedRows : (query.data?.results || [])),
+    [loadMode, accumulatedRows, query.data]
+  );
   const legendItems = useMemo(() => getLegendItems(rtype), [rtype]);
   const nodeLegendItems = useMemo(() => getNodeLegendItems(), []);
   const loadedCount = Number(networkTotal || rows.length || 0);
@@ -593,18 +605,57 @@ export default function NetworkPage() {
               <div>
                 <div className="d-flex align-items-center justify-content-between">
                   <Form.Label className="mb-1">Progressive loading</Form.Label>
-                  <Button
+                  <Form.Select
                     size="sm"
-                    variant="outline-secondary"
-                    disabled={!hasMoreRows || query.isLoading || rows.length >= NETWORK_MAX_RENDER_EDGES}
-                    onClick={() => setChunkOffset((prev) => prev + NETWORK_CHUNK_SIZE)}
+                    style={{ width: 170 }}
+                    value={loadMode}
+                    onChange={(e) => setLoadMode(e.target.value)}
                   >
-                    Load next {NETWORK_CHUNK_SIZE.toLocaleString()}
-                  </Button>
+                    <option value="append">Append mode</option>
+                    <option value="replace">Replace mode</option>
+                  </Form.Select>
                 </div>
-                <small className="hp-muted d-block">
-                  Use chunked loading to keep layout responsive on large interaction sets.
-                </small>
+                {loadMode === "append" ? (
+                  <>
+                    <div className="d-flex gap-2 mt-1">
+                      <Button
+                        size="sm"
+                        variant="outline-secondary"
+                        disabled={!hasMoreRows || query.isLoading || rows.length >= NETWORK_MAX_RENDER_EDGES}
+                        onClick={() => setChunkOffset((prev) => prev + NETWORK_CHUNK_SIZE)}
+                      >
+                        Load next {NETWORK_CHUNK_SIZE.toLocaleString()}
+                      </Button>
+                    </div>
+                    <small className="hp-muted d-block">
+                      Appends chunks for cumulative exploration (best for discovery).
+                    </small>
+                  </>
+                ) : (
+                  <>
+                    <div className="d-flex gap-2 mt-1">
+                      <Button
+                        size="sm"
+                        variant="outline-secondary"
+                        disabled={query.isLoading || chunkOffset <= 0}
+                        onClick={() => setChunkOffset((prev) => Math.max(0, prev - NETWORK_CHUNK_SIZE))}
+                      >
+                        Previous {NETWORK_CHUNK_SIZE.toLocaleString()}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline-secondary"
+                        disabled={query.isLoading || !hasMoreRows}
+                        onClick={() => setChunkOffset((prev) => prev + NETWORK_CHUNK_SIZE)}
+                      >
+                        Next {NETWORK_CHUNK_SIZE.toLocaleString()}
+                      </Button>
+                    </div>
+                    <small className="hp-muted d-block">
+                      Replaces current chunk (best for stable performance and easy previous/next navigation).
+                    </small>
+                  </>
+                )}
               </div>
 
               <div>
