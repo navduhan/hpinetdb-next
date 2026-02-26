@@ -13,6 +13,9 @@ export default defineConfig(({ mode }) => {
         "@": path.resolve(__dirname, "./src")
       }
     },
+    preview: {
+      allowedHosts: ["kaabil.net", "bioinfo.usu.edu"]
+    },
     server: {
       proxy: {
         "/hpinetbackend": {

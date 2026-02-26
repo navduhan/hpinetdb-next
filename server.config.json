@@ -4,7 +4,7 @@
       "name": "hpinetdb-next",
       "cwd": "/home/labadmin/apps/hpinetdb/hpinetdb-next",
       "script": "npm",
-      "args": "run preview -- --host 127.0.0.1 --port 3810 --strictPort",
+      "args": "run preview -- --host 0.0.0.0 --port 3810 --strictPort",
       "exec_mode": "fork",
       "instances": 1,
       "watch": false,
