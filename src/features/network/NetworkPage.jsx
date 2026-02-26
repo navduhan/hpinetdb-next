@@ -37,6 +37,8 @@ const LAYOUT_OPTIONS = [
   { value: "circle", label: "Circle" },
   { value: "grid", label: "Grid" }
 ];
+const NETWORK_CHUNK_SIZE = 5000;
+const NETWORK_MAX_RENDER_EDGES = 20000;
 
 function getLayoutConfig(name) {
   if (name === "cose") {
@@ -74,6 +76,10 @@ function buildEdgeId(row, rtype) {
   }
   const db = String(row.intdb || row.intdb_x || "Domain").trim() || "Domain";
   return `${db}-${row.Host_Protein}-${row.Pathogen_Protein}`;
+}
+
+function rowKeyOf(row, rtype) {
+  return `${buildEdgeId(row, rtype)}|${String(row.Host_Protein || "")}|${String(row.Pathogen_Protein || "")}`;
 }
 
 function normalizeSourceKey(raw) {
@@ -181,6 +187,11 @@ export default function NetworkPage() {
   const sourceTotal = Number.isFinite(sourceTotalParam) ? sourceTotalParam : null;
 
   const [search, setSearch] = useState("");
+  const [chunkOffset, setChunkOffset] = useState(0);
+  const [accumulatedRows, setAccumulatedRows] = useState([]);
+  const [networkTotal, setNetworkTotal] = useState(0);
+  const [hasMoreRows, setHasMoreRows] = useState(false);
+  const [fastMode, setFastMode] = useState(true);
   const [minConfidence, setMinConfidence] = useState(0);
   const [selectedSourceKeys, setSelectedSourceKeys] = useState([]);
   const [selectedNode, setSelectedNode] = useState(null);
@@ -196,16 +207,53 @@ export default function NetworkPage() {
   const nodeScoresRef = useRef({});
 
   const query = useQueryResource({
-    key: ["network", resultId],
+    key: ["network", resultId, rtype, chunkOffset],
     enabled: Boolean(resultId),
     staleTime: 60_000,
-    queryFn: ({ signal }) => hpinetApi.getNetwork({ resultId, category: rtype, signal })
+    queryFn: ({ signal }) =>
+      hpinetApi.getNetwork({
+        resultId,
+        category: rtype,
+        limit: NETWORK_CHUNK_SIZE,
+        offset: chunkOffset,
+        sort: "confidence_desc",
+        signal
+      })
   });
 
-  const rows = query.data?.results || [];
+  useEffect(() => {
+    setChunkOffset(0);
+    setAccumulatedRows([]);
+    setNetworkTotal(0);
+    setHasMoreRows(false);
+  }, [resultId, rtype]);
+
+  useEffect(() => {
+    if (!query.data) return;
+    const incoming = Array.isArray(query.data.results) ? query.data.results : [];
+    setNetworkTotal(Number(query.data.total || 0));
+    setHasMoreRows(Boolean(query.data.hasMore));
+    setAccumulatedRows((prev) => {
+      if (chunkOffset === 0) {
+        return incoming;
+      }
+      const seen = new Set(prev.map((row) => rowKeyOf(row, rtype)));
+      const merged = [...prev];
+      for (const row of incoming) {
+        const key = rowKeyOf(row, rtype);
+        if (!seen.has(key)) {
+          seen.add(key);
+          merged.push(row);
+        }
+      }
+      return merged;
+    });
+  }, [query.data, chunkOffset, rtype]);
+
+  const rows = accumulatedRows;
   const legendItems = useMemo(() => getLegendItems(rtype), [rtype]);
   const nodeLegendItems = useMemo(() => getNodeLegendItems(), []);
-  const loadedCount = Number(query.data?.total || rows.length || 0);
+  const loadedCount = Number(networkTotal || rows.length || 0);
   const supportsSourceFiltering = rtype === "interolog" || rtype === "consensus" || rtype === "domain";
   const availableSourceKeys = useMemo(() => {
     if (!supportsSourceFiltering) return [];
@@ -266,6 +314,9 @@ export default function NetworkPage() {
       .sort((a, b) => (resolveConfidenceValue(b) || 0) - (resolveConfidenceValue(a) || 0));
     return selectedRows.slice(0, Math.max(1, expandCount));
   }, [filteredRows, expandedNodeId, expandCount]);
+  const overRenderCap = visibleRows.length > NETWORK_MAX_RENDER_EDGES;
+  const renderRows = overRenderCap ? visibleRows.slice(0, NETWORK_MAX_RENDER_EDGES) : visibleRows;
+  const effectiveFastMode = fastMode || renderRows.length > 5000;
 
   useEffect(() => {
     if (!expandedNodeId) return;
@@ -278,7 +329,7 @@ export default function NetworkPage() {
   }, [expandedNodeId, filteredRows]);
 
   const elements = useMemo(() => {
-    const edges = visibleRows.map((row) => ({
+    const edges = renderRows.map((row) => ({
       data: {
         id: buildEdgeId(row, rtype),
         source: row.Host_Protein,
@@ -291,16 +342,16 @@ export default function NetworkPage() {
       }
     }));
 
-    const hosts = Array.from(new Set(visibleRows.map((row) => row.Host_Protein))).map((id) => ({
+    const hosts = Array.from(new Set(renderRows.map((row) => row.Host_Protein))).map((id) => ({
       data: { id, label: id, className: "host" }
     }));
 
-    const pathogens = Array.from(new Set(visibleRows.map((row) => row.Pathogen_Protein))).map((id) => ({
+    const pathogens = Array.from(new Set(renderRows.map((row) => row.Pathogen_Protein))).map((id) => ({
       data: { id, label: id, className: "pat" }
     }));
 
     return [...edges, ...hosts, ...pathogens];
-  }, [visibleRows, rtype]);
+  }, [renderRows, rtype]);
 
   const layoutConfig = useMemo(() => getLayoutConfig(layoutName), [layoutName]);
 
@@ -350,41 +401,63 @@ export default function NetworkPage() {
     { key: "Pathogen_Protein", header: "Pathogen", width: "2fr" }
   ];
 
-  function exportPng() {
+  function withExportLabels(exporter) {
     const cy = cyRef.current;
     if (!cy) return;
-    const uri = cy.png({ full: true, bg: "#ffffff", scale: 2 });
-    downloadUri(uri, `hpinet-network-${rtype}.png`);
+    const restoreLabel = effectiveFastMode ? "" : "data(label)";
+
+    cy.startBatch();
+    cy.nodes().style("label", "data(label)");
+    cy.nodes().style("font-size", 8);
+    cy.endBatch();
+    cy.fit(undefined, 20);
+
+    try {
+      exporter(cy);
+    } finally {
+      cy.startBatch();
+      cy.nodes().style("label", restoreLabel);
+      cy.nodes().style("font-size", 5);
+      cy.endBatch();
+    }
+  }
+
+  function exportPng() {
+    withExportLabels((cy) => {
+      const uri = cy.png({ full: true, bg: "#ffffff", scale: 3 });
+      downloadUri(uri, `hpinet-network-${rtype}.png`);
+    });
   }
 
   function exportSvg() {
-    const cy = cyRef.current;
-    if (!cy) return;
-    const svgMarkup = typeof cy.svg === "function"
-      ? cy.svg({ full: true, scale: 1, bg: "#ffffff" })
-      : null;
-    if (!svgMarkup) {
-      exportPng();
-      return;
-    }
-    const blob = new Blob([svgMarkup], { type: "image/svg+xml;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    downloadUri(url, `hpinet-network-${rtype}.svg`);
-    URL.revokeObjectURL(url);
+    withExportLabels((cy) => {
+      const svgMarkup = typeof cy.svg === "function"
+        ? cy.svg({ full: true, scale: 1, bg: "#ffffff" })
+        : null;
+      if (!svgMarkup) {
+        const uri = cy.png({ full: true, bg: "#ffffff", scale: 3 });
+        downloadUri(uri, `hpinet-network-${rtype}.png`);
+        return;
+      }
+      const blob = new Blob([svgMarkup], { type: "image/svg+xml;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      downloadUri(url, `hpinet-network-${rtype}.svg`);
+      URL.revokeObjectURL(url);
+    });
   }
 
   function exportPdf() {
-    const cy = cyRef.current;
-    if (!cy) return;
-    const pngUri = cy.png({ full: true, bg: "#ffffff", scale: 2 });
-    const pdf = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const margin = 18;
-    const drawWidth = pageWidth - margin * 2;
-    const drawHeight = pageHeight - margin * 2;
-    pdf.addImage(pngUri, "PNG", margin, margin, drawWidth, drawHeight, undefined, "FAST");
-    pdf.save(`hpinet-network-${rtype}.pdf`);
+    withExportLabels((cy) => {
+      const pngUri = cy.png({ full: true, bg: "#ffffff", scale: 3 });
+      const pdf = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 18;
+      const drawWidth = pageWidth - margin * 2;
+      const drawHeight = pageHeight - margin * 2;
+      pdf.addImage(pngUri, "PNG", margin, margin, drawWidth, drawHeight, undefined, "FAST");
+      pdf.save(`hpinet-network-${rtype}.pdf`);
+    });
   }
 
   function zoomIn() {
@@ -440,8 +513,10 @@ export default function NetworkPage() {
       },
       counts: {
         loadedRows: loadedCount,
+        fetchedRows: rows.length,
         filteredRows: filteredRows.length,
         visibleRows: visibleRows.length,
+        renderedRows: renderRows.length,
         nodes: networkMetrics.nodes,
         edges: networkMetrics.edges
       }
@@ -457,7 +532,7 @@ export default function NetworkPage() {
       />
 
       {!resultId ? <ErrorState message="Missing result ID (`resultid`) in query params." /> : null}
-      {query.isLoading ? <LoadingState label="Loading network" /> : null}
+      {query.isLoading && rows.length === 0 ? <LoadingState label="Loading network" /> : null}
       {query.error ? <ErrorState message={query.error.message} /> : null}
 
       {!query.isLoading && !query.error && resultId ? (
@@ -475,6 +550,14 @@ export default function NetworkPage() {
                     ? `This network is built from Results page ${sourcePage + 1} with page size ${sourceSize}${sourceTotal ? ` (total ${sourceTotal.toLocaleString()})` : ""}.`
                     : `Loaded ${loadedCount.toLocaleString()} interactions from result collection.`}
                 </small>
+                <small className="hp-muted d-block">
+                  Fetched: {rows.length.toLocaleString()} / {loadedCount.toLocaleString()}
+                </small>
+                {overRenderCap ? (
+                  <small className="hp-muted d-block">
+                    Rendering capped at {NETWORK_MAX_RENDER_EDGES.toLocaleString()} edges for performance. Refine filters or expand from a selected node.
+                  </small>
+                ) : null}
               </div>
 
               <div>
@@ -490,6 +573,23 @@ export default function NetworkPage() {
                   }}
                 />
                 <small className="hp-muted d-block">Threshold: {minConfidence.toFixed(2)}</small>
+              </div>
+
+              <div>
+                <div className="d-flex align-items-center justify-content-between">
+                  <Form.Label className="mb-1">Progressive loading</Form.Label>
+                  <Button
+                    size="sm"
+                    variant="outline-secondary"
+                    disabled={!hasMoreRows || query.isLoading || rows.length >= NETWORK_MAX_RENDER_EDGES}
+                    onClick={() => setChunkOffset((prev) => prev + NETWORK_CHUNK_SIZE)}
+                  >
+                    Load next {NETWORK_CHUNK_SIZE.toLocaleString()}
+                  </Button>
+                </div>
+                <small className="hp-muted d-block">
+                  Use chunked loading to keep layout responsive on large interaction sets.
+                </small>
               </div>
 
               <div>
@@ -562,7 +662,7 @@ export default function NetworkPage() {
                 <h6 className="mb-2">Interaction Table</h6>
                 <VirtualizedTable
                   columns={columns}
-                  rows={visibleRows}
+                  rows={renderRows}
                   rowKey={(row, idx) => `${row.Host_Protein}-${row.Pathogen_Protein}-${idx}`}
                   onRowClick={(row) => setSelectedEdge({ ...row, id: buildEdgeId(row, rtype) })}
                   height={430}
@@ -603,6 +703,15 @@ export default function NetworkPage() {
               </div>
 
               <small className="hp-muted d-block mb-2">Mouse: wheel to zoom, drag to pan.</small>
+              <div className="mb-2">
+                <Form.Check
+                  type="switch"
+                  id="network-fast-mode"
+                  label="Fast render mode (recommended for large networks)"
+                  checked={fastMode}
+                  onChange={(e) => setFastMode(e.target.checked)}
+                />
+              </div>
 
               <CytoscapeComponent
                 elements={elements}
@@ -615,7 +724,7 @@ export default function NetworkPage() {
                       width: 10,
                       height: 10,
                       "font-size": 5,
-                      label: "data(label)",
+                      label: effectiveFastMode ? "" : "data(label)",
                       color: "#233",
                       "text-wrap": "none"
                     }
@@ -635,9 +744,9 @@ export default function NetworkPage() {
                   {
                     selector: "edge",
                     style: {
-                      width: 1,
+                      width: effectiveFastMode ? 0.8 : 1,
                       "line-color": "data(edgeColor)",
-                      opacity: 0.8
+                      opacity: effectiveFastMode ? 0.7 : 0.8
                     }
                   }
                 ]}

@@ -14,12 +14,21 @@ export const hpinetApi = {
     return normalizePagedResponse(data);
   },
 
-  getNetwork: async ({ resultId, category, signal }) => {
+  getNetwork: async ({ resultId, category, limit, offset, sort, signal }) => {
     const data = await request("/api/network/", {
-      query: { results: resultId, category },
+      query: { results: resultId, category, limit, offset, sort },
       signal
     });
-    return normalizePagedResponse(data);
+    return {
+      ...normalizePagedResponse(data),
+      returned: Number(data?.returned || 0),
+      offset: Number(data?.offset || 0),
+      limit: Number(data?.limit || 0),
+      hasMore: Boolean(data?.hasMore),
+      nextOffset: data?.nextOffset === null || data?.nextOffset === undefined
+        ? null
+        : Number(data.nextOffset)
+    };
   },
 
   postDomainResults: async ({ body, signal }) => {
