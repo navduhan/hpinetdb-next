@@ -588,7 +588,7 @@ export default function NetworkPage() {
       {query.isLoading && rows.length === 0 ? <LoadingState label="Loading network" /> : null}
       {query.error ? <ErrorState message={query.error.message} /> : null}
 
-      {!query.isLoading && !query.error && resultId ? (
+      {!query.error && resultId ? (
         <Row className="g-3">
           <Col xl={4}>
             <div className="hp-card h-100 d-flex flex-column gap-3">
@@ -752,6 +752,9 @@ export default function NetworkPage() {
 
               <div className="mt-1">
                 <h6 className="mb-2">Interaction Table</h6>
+                {query.isLoading && rows.length > 0 ? (
+                  <small className="hp-muted d-block mb-2">Loading next chunk...</small>
+                ) : null}
                 <VirtualizedTable
                   columns={columns}
                   rows={renderRows}
